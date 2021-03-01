@@ -8,6 +8,9 @@ if (!fs.existsSync('dist')) {
   fs.mkdirSync('dist')
 }
 
+
+// vuejs构建的入口 ////////////
+// 从配置文件读取配置
 let builds = require('./config').getAllBuilds()
 
 // filter builds via command line arg
@@ -24,6 +27,7 @@ if (process.argv[2]) {
 }
 
 build(builds)
+// vuejs构建的入口 /////////////
 
 function build (builds) {
   let built = 0
