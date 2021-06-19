@@ -87,10 +87,23 @@ Vue.js 会定义一些工具方法，这里定义的工具方法都是会被浏�
 
 ### 源码构建过程
 
+vue的源码是基于rollup构建的
+
+分析package.json
+
+```javascript
+"main": "dist/vue.runtime.common.js", //默认入口
+"module": "dist/vue.runtime.esm.js", //默认入口
+
+"build": "node scripts/build.js", //构建相关
+"build:ssr": "npm run build -- web-runtime-cjs,web-server-renderer",
+"build:weex": "npm run build -- weex",
+```
+
 我们对于构建过程分析是基于源码的，先打开构建的入口 JS 文件，在 scripts/build.js 中：
 
 ```javascript
-let builds = require('./config').getAllBuilds()
+let builds = require('./config').getAllBuilds()//拿到构建需要的配置
 
 // filter builds via command line arg
 if (process.argv[2]) {
@@ -497,7 +510,7 @@ export default Vue
 
 在这里，我们终于看到了`Vue 的庐山真面目`，它`实际上就是一个用 Function 实现的类`，我们只能`通过 new Vue 去实例化`它。
 
-有些同学看到这不禁想问，为何 Vue 不用 ES6 的 Class 去实现呢？我们往后看这里有`很多 xxxMixin 的函数调用`，并`把 Vue 当参数传入`，`它们的功能都是给 Vue 的 prototype 上扩展一些方法`（这里具体的细节会在之后的文章介绍，这里不展开），Vue 按功能把这些扩展分散到多个模块中去实现，而不是在一个模块里实现所有，这种方式是用 Class 难以实现的。这么做的好处是非常方便代码的维护和管理，这种编程技巧也非常值得我们去学习。
+为何 Vue 不用 ES6 的 Class 去实现呢？我们往后看这里有`很多 xxxMixin 的函数调用`，并`把 Vue 当参数传入`，`它们的功能都是给 Vue 的 prototype 上扩展一些方法`，Vue 按功能把这些扩展分散到多个模块中去实现，而不是在一个模块里实现所有，这种方式是用 Class 难以实现的。这么做的好处是非常方便代码的维护和管理，这种编程技巧也非常值得我们去学习。
 
 ##### initGlobalAPI
 
@@ -555,12 +568,94 @@ export function initGlobalAPI (Vue: GlobalAPI) {
 
 #### 总结
 
-那么至此，Vue 的初始化过程基本介绍完毕。这一节的目的是让同学们对 Vue 是什么有一个直观的认识，
+那么至此，Vue 的初始化过程基本介绍完毕。
 `它本质上就是一个用 Function 实现的 Class`，
 然后`它的原型 prototype 以及它本身都扩展了一系列的方法和属性`，
-那么 Vue 能做什么，它是怎么做的，我们会在后面的章节一层层帮大家揭开 Vue 的神秘面纱。
+那么 Vue 能做什么，它是怎么做的？
 
 ## 数据驱动
+
+所谓数据驱动，是指视图是由数据驱动生成的，我们对视图的修改，不会直接操作 DOM，而是通过修改数据。
+
+- new Vue() 发生了啥？
+
+  - new,意味着实例化一个对象，而Vue实际上是一个类，类在Js中用Function实现。
+
+  - ```javascript
+    function Vue (options) {
+      if (process.env.NODE_ENV !== 'production' &&
+        !(this instanceof Vue)
+      ) {
+        warn('Vue is a constructor and should be called with the `new` keyword')
+      }
+      this._init(options)
+    }
+    //位置：src/core/instance/index.js
+    ```
+
+    this._init方法在src/core/instance/init.js 中定义
+
+    Vue 初始化主要就干了几件事情，合并配置，初始化生命周期，初始化事件中心，初始化渲染，初始化 data、props、computed、watcher 等等
+
+    ```javascript
+    Vue.prototype._init = function (options?: Object) {
+      const vm: Component = this
+      // a uid
+      vm._uid = uid++
+    
+      let startTag, endTag
+      /* istanbul ignore if */
+      if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
+        startTag = `vue-perf-start:${vm._uid}`
+        endTag = `vue-perf-end:${vm._uid}`
+        mark(startTag)
+      }
+    
+      // a flag to avoid this being observed
+      vm._isVue = true
+      // merge options
+      if (options && options._isComponent) {
+        // optimize internal component instantiation
+        // since dynamic options merging is pretty slow, and none of the
+        // internal component options needs special treatment.
+        initInternalComponent(vm, options)
+      } else {
+        vm.$options = mergeOptions(
+          resolveConstructorOptions(vm.constructor),
+          options || {},
+          vm
+        )
+      }
+      /* istanbul ignore else */
+      if (process.env.NODE_ENV !== 'production') {
+        initProxy(vm)
+      } else {
+        vm._renderProxy = vm
+      }
+      // expose real self
+      vm._self = vm
+      initLifecycle(vm)
+      initEvents(vm)
+      initRender(vm)
+      callHook(vm, 'beforeCreate')
+      initInjections(vm) // resolve injections before data/props
+      initState(vm)
+      initProvide(vm) // resolve provide after data/props
+      callHook(vm, 'created')
+    
+      /* istanbul ignore if */
+      if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
+        vm._name = formatComponentName(vm, false)
+        mark(endTag)
+        measure(`vue ${vm._name} init`, startTag, endTag)
+      }
+    
+      if (vm.$options.el) {
+        vm.$mount(vm.$options.el) //！！！！！！！！！！！
+      }
+    }
+    ```
+
 
 ## 组件化
 
